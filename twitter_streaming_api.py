@@ -11,15 +11,16 @@ from json import dumps
 
 class listener(StreamListener):
     """
-    This class will read tweets form twitter
-    and work as a producer to move the tweets to kafka
+    This class is created by inheriting StreamListnerclass from tweepy
+    This class works as a kafka producer and reads streaming tweets based on the set filter and sends the same to
+    kafka messaging server
     """
 
     def __init__(self):
 
         self.producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
                             # value_serializer=lambda m: dumps(m).encode('ascii'))
-                            value_serializer = lambda m: dumps(m).encode('-utf8'))
+                            value_serializer = lambda m: dumps(m).encode('utf-8'))
 
     def on_data(self, data):
         """ This method is called whenever new data arrives from live stream.
@@ -30,10 +31,11 @@ class listener(StreamListener):
         start = data.find('"text":') + len('"text":')
         end = data.find('"source"')
         substring = data[start:end]
-        print(substring)
+        print(data)
+      #  print(substring)
 
         try:
-            self.producer.send('streamingtweets', substring)
+            self.producer.send('streamingtweets', substring)  # topic=streamingtweets, msg=substring
         except Exception as e:
             print(e)
             return False
@@ -55,6 +57,8 @@ if __name__ == '__main__':
     ##  Load API Tokens from json file
     #####################################
 
+    # First step is to read the secret keys and tokens for authenticating with tweeter
+    #The tiockens and secret keys are stored in a separte json file for security purposes
     tokenfile = open('./twitter_tokens.json')
     tokens = json.load(tokenfile)
     ckey = tokens['ckey']
@@ -62,12 +66,17 @@ if __name__ == '__main__':
     atoken = tokens['atoken']
     asecret = tokens['asecret']
 
-    # Create Auth object
+    # Using the secret keys/tokens create an auth object
     authobject = OAuthHandler(ckey, csecret)
     authobject.set_access_token(atoken, asecret)
 
-    # Create stream and bind the listener to it
+    # Using the listener class create a Stream object
     twitterstream = Stream(authobject, listener())
+
+    #connect with Twitter API using the stream object and filter the tweets for Tesla
     twitterstream.filter(track=["$TSLA"])
+
+
+
     # twitterstream.filter(track=["$TSLA", "$F"], languages = ["en") #You can have more than one filter
     # twitterstream.filter(locations=[-180, -90, 180, 90], languages=['en']) #You can also filter by location
